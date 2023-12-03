@@ -35,6 +35,15 @@ class SearchType(Enum):
     ytmsearch = "ytmsearch"
     scsearch = "scsearch"
 
+    spsearch = "spsearch"
+    amsearch = "amsearch"
+    dzsearch = "dzsearch"
+    ymsearch = "ymsearch"
+
+    sprec = "sprec"
+
+    ftts = "ftts"
+
     def __str__(self) -> str:
         return self.value
 
@@ -60,7 +69,10 @@ class TrackType(Enum):
     YOUTUBE = "youtube"
     SOUNDCLOUD = "soundcloud"
     SPOTIFY = "spotify"
+    DEZEER = "dezeer"
+    YANDEX_MUSIC = "yandex_music"
     APPLE_MUSIC = "apple_music"
+    TTS = "ftts"
     HTTP = "http"
     LOCAL = "local"
 
@@ -85,6 +97,7 @@ class PlaylistType(Enum):
     YOUTUBE = "youtube"
     SOUNDCLOUD = "soundcloud"
     SPOTIFY = "spotify"
+    YANDEX_MUSIC = "yandex_music"
     APPLE_MUSIC = "apple_music"
 
     def __str__(self) -> str:
@@ -243,7 +256,11 @@ class URLRegex:
         r"^(https?:\/\/)?(www.)?(m\.)?soundcloud\.com/[a-zA-Z0-9-._]+/[a-zA-Z0-9-._]+(\?in)",
     )
 
-    LAVALINK_SEARCH = re.compile(r"(?P<type>ytm?|sc)search:")
+    LAVALINK_SEARCH = re.compile(r"(?:yt|ytm|sc|sp|dz|am)search:.")
+
+    LAVALINK_REC = re.compile(r"(?:yt|ytm|sc|sp|dz|am)rec:.")
+
+    LAVALINK_TTS = re.compile(r"ftts:.")
 
     BASE_URL = re.compile(r"https?://(?:www\.)?.+")
 

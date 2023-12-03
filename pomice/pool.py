@@ -18,9 +18,9 @@ from urllib.parse import quote
 
 import aiohttp
 import orjson as json
-from discord import Client
-from discord.ext import commands
-from discord.utils import MISSING
+from disnake import Client, Interaction
+from disnake.ext import commands
+from disnake.utils import MISSING
 from websockets import client
 from websockets import exceptions
 from websockets import typing as wstype
@@ -30,8 +30,6 @@ from . import applemusic
 from . import spotify
 from .enums import *
 from .enums import LogLevel
-from .exceptions import AppleMusicNotEnabled
-from .exceptions import InvalidSpotifyClientAuthorization
 from .exceptions import LavalinkVersionIncompatible
 from .exceptions import NodeConnectionFailure
 from .exceptions import NodeCreationError
@@ -209,7 +207,7 @@ class Node:
 
     @property
     def bot(self) -> Client:
-        """Property which returns the discord.py client linked to this node"""
+        """Property which returns the disnake client linked to this node"""
         return self._bot
 
     @property
@@ -544,11 +542,11 @@ class Node:
             f"Successfully disconnected from node {self._identifier} and closed all sessions. Took {end - start:.3f}s",
         )
 
-    async def build_track(self, identifier: str, ctx: Optional[commands.Context] = None) -> Track:
+    async def build_track(self, identifier: str, ctx: Optional[Union[commands.Context, Interaction]] = None) -> Track:
         """
         Builds a track using a valid track identifier
 
-        You can also pass in a discord.py Context object to get a
+        You can also pass in a disnake Context object to get a
         Context object on the track it builds.
         """
 
@@ -568,7 +566,7 @@ class Node:
         self,
         query: str,
         *,
-        ctx: Optional[commands.Context] = None,
+        ctx: Optional[Union[commands.Context, Interaction]] = None,
         search_type: SearchType = SearchType.ytsearch,
         filters: Optional[List[Filter]] = None,
     ) -> Optional[Union[Playlist, List[Track]]]:
@@ -577,7 +575,7 @@ class Node:
         If you passed in Spotify API credentials, you can also pass in a
         Spotify URL of a playlist, album or track and it will be parsed accordingly.
 
-        You can pass in a discord.py Context object to get a
+        You can pass in a disnake Context object to get a
         Context object on any track you search.
 
         You may also pass in a List of filters
@@ -590,139 +588,7 @@ class Node:
             for filter in filters:
                 filter.set_preload()
 
-        if URLRegex.AM_URL.match(query):
-            if not self._apple_music_client:
-                raise AppleMusicNotEnabled(
-                    "You must have Apple Music functionality enabled in order to play Apple Music tracks."
-                    "Please set apple_music to True in your Node class.",
-                )
-
-            apple_music_results = await self._apple_music_client.search(query=query)
-            if isinstance(apple_music_results, applemusic.Song):
-                return [
-                    Track(
-                        track_id=apple_music_results.id,
-                        ctx=ctx,
-                        track_type=TrackType.APPLE_MUSIC,
-                        search_type=search_type,
-                        filters=filters,
-                        info={
-                            "title": apple_music_results.name,
-                            "author": apple_music_results.artists,
-                            "length": apple_music_results.length,
-                            "identifier": apple_music_results.id,
-                            "uri": apple_music_results.url,
-                            "isStream": False,
-                            "isSeekable": True,
-                            "position": 0,
-                            "thumbnail": apple_music_results.image,
-                            "isrc": apple_music_results.isrc,
-                        },
-                    ),
-                ]
-
-            tracks = [
-                Track(
-                    track_id=track.id,
-                    ctx=ctx,
-                    track_type=TrackType.APPLE_MUSIC,
-                    search_type=search_type,
-                    filters=filters,
-                    info={
-                        "title": track.name,
-                        "author": track.artists,
-                        "length": track.length,
-                        "identifier": track.id,
-                        "uri": track.url,
-                        "isStream": False,
-                        "isSeekable": True,
-                        "position": 0,
-                        "thumbnail": track.image,
-                        "isrc": track.isrc,
-                    },
-                )
-                for track in apple_music_results.tracks
-            ]
-
-            return Playlist(
-                playlist_info={
-                    "name": apple_music_results.name,
-                    "selectedTrack": 0,
-                },
-                tracks=tracks,
-                playlist_type=PlaylistType.APPLE_MUSIC,
-                thumbnail=apple_music_results.image,
-                uri=apple_music_results.url,
-            )
-
-        elif URLRegex.SPOTIFY_URL.match(query):
-            if not self._spotify_client_id and not self._spotify_client_secret:
-                raise InvalidSpotifyClientAuthorization(
-                    "You did not provide proper Spotify client authorization credentials. "
-                    "If you would like to use the Spotify searching feature, "
-                    "please obtain Spotify API credentials here: https://developer.spotify.com/",
-                )
-
-            spotify_results = await self._spotify_client.search(query=query)  # type: ignore
-
-            if isinstance(spotify_results, spotify.Track):
-                return [
-                    Track(
-                        track_id=spotify_results.id,
-                        ctx=ctx,
-                        track_type=TrackType.SPOTIFY,
-                        search_type=search_type,
-                        filters=filters,
-                        info={
-                            "title": spotify_results.name,
-                            "author": spotify_results.artists,
-                            "length": spotify_results.length,
-                            "identifier": spotify_results.id,
-                            "uri": spotify_results.uri,
-                            "isStream": False,
-                            "isSeekable": True,
-                            "position": 0,
-                            "thumbnail": spotify_results.image,
-                            "isrc": spotify_results.isrc,
-                        },
-                    ),
-                ]
-
-            tracks = [
-                Track(
-                    track_id=track.id,
-                    ctx=ctx,
-                    track_type=TrackType.SPOTIFY,
-                    search_type=search_type,
-                    filters=filters,
-                    info={
-                        "title": track.name,
-                        "author": track.artists,
-                        "length": track.length,
-                        "identifier": track.id,
-                        "uri": track.uri,
-                        "isStream": False,
-                        "isSeekable": True,
-                        "position": 0,
-                        "thumbnail": track.image,
-                        "isrc": track.isrc,
-                    },
-                )
-                for track in spotify_results.tracks
-            ]
-
-            return Playlist(
-                playlist_info={
-                    "name": spotify_results.name,
-                    "selectedTrack": 0,
-                },
-                tracks=tracks,
-                playlist_type=PlaylistType.SPOTIFY,
-                thumbnail=spotify_results.image,
-                uri=spotify_results.uri,
-            )
-
-        elif discord_url := URLRegex.DISCORD_MP3_URL.match(query):
+        if discord_url := URLRegex.DISCORD_MP3_URL.match(query):
             data: dict = await self.send(
                 method="GET",
                 path="loadtracks",
@@ -778,7 +644,7 @@ class Node:
             ]
 
         else:
-            if not URLRegex.BASE_URL.match(query) and not re.match(r"(?:ytm?|sc)search:.", query):
+            if not URLRegex.BASE_URL.match(query) and not URLRegex.LAVALINK_SEARCH.match(query) and not URLRegex.LAVALINK_REC.match(query):
                 query = f"{search_type}:{query}"
 
             # If YouTube url contains a timestamp, capture it for use later.
@@ -860,39 +726,30 @@ class Node:
         self,
         *,
         track: Track,
-        ctx: Optional[commands.Context] = None,
+        seed_tracks: Optional[str] = None,
+        ctx: Optional[Union[commands.Context, Interaction]] = None,
+        **kwargs
     ) -> Optional[Union[List[Track], Playlist]]:
         """
         Gets recommendations from either YouTube or Spotify.
         The track that is passed in must be either from
         YouTube or Spotify or else this will not work.
-        You can pass in a discord.py Context object to get a
+        You can pass in a disnake Context object to get a
         Context object on all tracks that get recommended.
         """
         if track.track_type == TrackType.SPOTIFY:
-            results = await self._spotify_client.get_recommendations(query=track.uri)  # type: ignore
-            tracks = [
-                Track(
-                    track_id=track.id,
-                    ctx=ctx,
-                    track_type=TrackType.SPOTIFY,
-                    info={
-                        "title": track.name,
-                        "author": track.artists,
-                        "length": track.length,
-                        "identifier": track.id,
-                        "uri": track.uri,
-                        "isStream": False,
-                        "isSeekable": True,
-                        "position": 0,
-                        "thumbnail": track.image,
-                        "isrc": track.isrc,
-                    },
-                    requester=self.bot.user,
-                )
-                for track in results
-            ]
-            return tracks
+            if track and not seed_tracks:
+                seed_tracks = track.identifier
+
+            query = f"sprec:seed_tracks={seed_tracks}"
+
+            for param in kwargs:
+                query += f"&{param}={kwargs.get(param) if type(kwargs.get(param)) == str else ','.split(kwargs.get(param))}"
+
+            return self.get_tracks(query=query, ctx=ctx or track.ctx,)
+
+            
+                
 
         elif track.track_type == TrackType.YOUTUBE:
             return await self.get_tracks(

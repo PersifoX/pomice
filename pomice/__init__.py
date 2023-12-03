@@ -1,23 +1,23 @@
 """
 Pomice
 ~~~~~~
-The modern Lavalink wrapper designed for discord.py.
+The modern Lavalink wrapper designed for disnake.
 
 Copyright (c) 2023, cloudwithax
 
 Licensed under GPL-3.0
 """
-import discord
+import disnake
 
-if not discord.version_info.major >= 2:
+if not disnake.version_info.major >= 2:
 
     class DiscordPyOutdated(Exception):
         pass
 
     raise DiscordPyOutdated(
-        "You must have discord.py (v2.0 or greater) to use this library. "
-        "Uninstall your current version and install discord.py 2.0 "
-        "using 'pip install discord.py'",
+        "You must have disnake (v2.0 or greater) to use this library. "
+        "Uninstall your current version and install disnake 2.0 "
+        "using 'pip install disnake'",
     )
 
 __version__ = "2.7.2"

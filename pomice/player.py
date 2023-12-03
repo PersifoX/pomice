@@ -8,11 +8,11 @@ from typing import Optional
 from typing import TYPE_CHECKING
 from typing import Union
 
-from discord import Client
-from discord import Guild
-from discord import VoiceChannel
-from discord import VoiceProtocol
-from discord.ext import commands
+from disnake import Client
+from disnake import Guild
+from disnake import VoiceChannel
+from disnake import VoiceProtocol
+from disnake.ext import commands
 
 from . import events
 from .enums import SearchType
@@ -204,8 +204,6 @@ class Player(VoiceProtocol):
             return 0
 
         current: Track = self._current  # type: ignore
-        if current.original:
-            current = current.original
 
         if self.is_paused:
             return min(self._last_position, current.length)
@@ -321,7 +319,7 @@ class Player(VoiceProtocol):
 
         self._log.debug(f"Dispatched voice update to {state['event']['endpoint']} with data {data}")
 
-    async def on_voice_server_update(self, data: VoiceServerUpdate) -> None:
+    async def on_voice_server_update(self, data: Any) -> None:
         self._voice_state.update({"event": data})
         await self._dispatch_voice_update(self._voice_state)
 
@@ -386,7 +384,7 @@ class Player(VoiceProtocol):
         query: str,
         *,
         ctx: Optional[commands.Context] = None,
-        search_type: SearchType = SearchType.ytsearch,
+        search_type: SearchType = SearchType.spsearch,
         filters: Optional[List[Filter]] = None,
     ) -> Optional[Union[List[Track], Playlist]]:
         """Fetches tracks from the node's REST api to parse into Lavalink.
