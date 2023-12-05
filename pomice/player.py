@@ -33,8 +33,8 @@ from .pool import NodePool
 from pomice.utils import LavalinkVersion
 
 if TYPE_CHECKING:
-    from discord.types.voice import VoiceServerUpdate
-    from discord.types.voice import GuildVoiceState
+    from disnake.types.gateway import VoiceServerUpdateEvent
+    from disnake.types.voice import GuildVoiceState
 
 __all__ = ("Filters", "Player")
 
@@ -323,7 +323,7 @@ class Player(VoiceProtocol):
         self._voice_state.update({"event": data})
         await self._dispatch_voice_update(self._voice_state)
 
-    async def on_voice_state_update(self, data: GuildVoiceState) -> None:
+    async def on_voice_state_update(self, data: Any) -> None:
         self._voice_state.update({"sessionId": data.get("session_id")})
 
         channel_id = data.get("channel_id")
@@ -429,7 +429,7 @@ class Player(VoiceProtocol):
         *,
         timeout: float,
         reconnect: bool,
-        self_deaf: bool = False,
+        self_deaf: bool = True,
         self_mute: bool = False,
     ) -> None:
         await self.guild.change_voice_state(
