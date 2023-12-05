@@ -725,7 +725,7 @@ class Node:
             return self.get_tracks(query=query, ctx=ctx or track.ctx,)
                 
 
-        elif track.track_type in TrackType.YOUTUBE:
+        elif track.track_type == TrackType.YOUTUBE:
             if not playlist_id:
                 query = self._ytm_client.get_watch_playlist(videoId=track.identifier, **kwargs)['tracks']
             else:
