@@ -26,6 +26,7 @@ class Queue(Iterable[Track]):
         "_overflow",
         "_loop_mode",
         "_current_item",
+        "_return_exceptions",
     )
 
     def __init__(
@@ -33,12 +34,14 @@ class Queue(Iterable[Track]):
         max_size: Optional[int] = None,
         *,
         overflow: bool = True,
+        return_exceptions: bool = False
     ):
         self.max_size: Optional[int] = max_size
-        self._current_item: Track | None = None
+        self._current_item: Optional[Track] = None
         self._queue: List[Track] = []
         self._overflow: bool = overflow
         self._loop_mode: Optional[LoopMode] = None
+        self._return_exceptions: bool = return_exceptions
 
     def __str__(self) -> str:
         """String showing all Track objects appearing as a list."""
@@ -141,6 +144,12 @@ class Queue(Iterable[Track]):
 
     def _get_random_float(self) -> float:
         return random.random()
+    
+    def _get_item(self, item: Union[Track, int]) -> Track:
+        if type(item) == Track:
+            return item
+        
+        return self._queue[item]
 
     @staticmethod
     def _check_track(item: Track) -> Track:
@@ -192,54 +201,77 @@ class Queue(Iterable[Track]):
         return self._queue
 
     def get(self) -> Track:
+        """Alias for `next()` with additional check LoopMode
+        """
+
+        if self._loop_mode == LoopMode.TRACK and self._current_item:
+            return self._current_item
+
+        return self.next()
+    
+    def next(self):
         """Return next immediately available item in queue if any.
         Raises QueueEmpty if no items in queue.
         """
-
-        if self._loop_mode == LoopMode.TRACK:
-            return self._current_item
-
         if self.is_empty:
-            raise QueueEmpty("No items in the queue.")
-
-        if self._loop_mode == LoopMode.QUEUE:
-            # recurse if the item isnt in the queue
-            if self._current_item not in self._queue:
-                self.get()
-
-            # set current item to first track in queue if not set already
-            if not self._current_item:
-                self._current_item = self._queue[0]
-                item = self._current_item
-
-            # we reached the end of the queue, go back to first track
-            if self._index(self._current_item) == len(self._queue) - 1:
-                item = self._queue[0]
-
-            # we are in the middle of the queue, go the next item
+            if self._return_exceptions:
+                raise QueueEmpty("No items in the queue.")
             else:
-                index = self._index(self._current_item) + 1
-                item = self._queue[index]
+                return
+        
+        if not self._current_item or self._current_item not in self._queue:
+            self._current_item = self._queue[0]
+
+        elif self.find_position(self._current_item) == self.count - 1:
+            return self.clear()
+        
         else:
-            item = self._get()
+            self._current_item = self._queue[self.find_position(self._current_item) + 1]
 
-        self._current_item = item
-        return item
-
-    def pop(self) -> Track:
-        """Return item from the right end side of the queue.
+        return self._current_item
+    
+    def prev(self):
+        """Return prevision immediately available item in queue if any.
         Raises QueueEmpty if no items in queue.
         """
         if self.is_empty:
-            raise QueueEmpty("No items in the queue.")
+            if self._return_exceptions:
+                raise QueueEmpty("No items in the queue.")
+            else:
+                return
+        
+        if not self._current_item or self._current_item not in self._queue:
+            self._current_item = self._queue[0]
 
-        return self._queue.pop()
+        elif not self.find_position(self._current_item):
+            return
+        
+        else:
+            self._current_item = self._queue[self.find_position(self._current_item) - 1]
 
-    def remove(self, item: Track) -> None:
+        return self._current_item
+
+    def pop(self, index = -1) -> Track:
+        """Return item from queue.
+        Raises QueueEmpty if no items in queue.
+        """
+        if self.is_empty:
+            if self._return_exceptions:
+                raise QueueEmpty("No items in the queue.")
+            else:
+                return
+
+        return self._queue.pop(index)
+
+    def remove(self, item: Union[Track, int]) -> None:
         """
         Removes a item within the queue.
         Raises ValueError if item is not in queue.
         """
+        item = self._get_item(item)
+
+        if item == self._current_item:
+            self._current_item = self._queue[self.find_position(self._current_item) - 1]
         return self._remove(self._check_track(item))
 
     def find_position(self, item: Track) -> int:
@@ -252,9 +284,12 @@ class Queue(Iterable[Track]):
         """Put the given item into the back of the queue."""
         if self.is_full:
             if not self._overflow:
-                raise QueueFull(
-                    f"Queue max_size of {self.max_size} has been reached.",
-                )
+                if self._return_exceptions:
+                    raise QueueFull(
+                        f"Queue max_size of {self.max_size} has been reached.",
+                    )
+                else:
+                    return
 
             self._drop()
 
@@ -264,9 +299,12 @@ class Queue(Iterable[Track]):
         """Put the given item into the queue at the specified index."""
         if self.is_full:
             if not self._overflow:
-                raise QueueFull(
-                    f"Queue max_size of {self.max_size} has been reached.",
-                )
+                if self._return_exceptions:
+                    raise QueueFull(
+                        f"Queue max_size of {self.max_size} has been reached.",
+                    )
+                else:
+                    return
 
             self._drop()
 
@@ -290,10 +328,13 @@ class Queue(Iterable[Track]):
                 new_len = len(iterable)
 
                 if (new_len + self.count) > self.max_size:
-                    raise QueueFull(
+                    if self._return_exceptions:
+                        raise QueueFull(
                         f"Queue has {self.count}/{self.max_size} items, "
                         f"cannot add {new_len} more.",
                     )
+                    else:
+                        return
 
         for item in iterable:
             self.put(item)
@@ -330,41 +371,60 @@ class Queue(Iterable[Track]):
         Raises QueueException if loop mode is already None.
         """
         if not self._loop_mode:
-            raise QueueException("Queue loop is already disabled.")
-
-        if self._loop_mode == LoopMode.QUEUE:
-            index = self.find_position(self._current_item) + 1
-            self._queue = self._queue[index:]
+            if self._return_exceptions:
+                raise QueueException("Queue loop is already disabled.")
+            else:
+                return
 
         self._loop_mode = None
 
     def shuffle(self) -> None:
         """Shuffles the queue."""
-        return random.shuffle(self._queue)
+        random.shuffle(self._queue)
+
+        self._queue.remove(self._current_item)
+        self._insert(0, self._current_item)
 
     def clear_track_filters(self) -> None:
         """Clears all filters applied to tracks"""
         for track in self._queue:
             track.filters = None
 
-    def jump(self, item: Track) -> None:
+    def jump(self, item: Union[Track, int]) -> Track:
         """
         Jumps to the item specified in the queue.
-
-        If the queue is not looping, the queue will be mutated.
-        Otherwise, the current item will be adjusted to the item
-        before the specified track.
-
-        The queue is adjusted so that the next item that is retrieved
-        is the track that is specified, effectively 'jumping' the queue.
         """
 
         if self._loop_mode == LoopMode.TRACK:
-            raise QueueException("Jumping the queue whilst looping a track is not allowed.")
-
-        index = self.find_position(item)
-        if self._loop_mode == LoopMode.QUEUE:
-            self._current_item = self._queue[index - 1]
+            if self._return_exceptions:
+                raise QueueException("Jumping the queue whilst looping a track is not allowed.")
+            else:
+                return
+            
+        
+        if item in self._queue:
+            self._current_item = self._get_item(item)
+        
         else:
-            new_queue = self._queue[index : self.size]
-            self._queue = new_queue
+            raise QueueException("Item not found in Queue.")
+        
+        return self._current_item
+        
+    def move(self, item: Union[Track, int], index: int) -> None:
+        """
+        Move item in the queue.
+        """
+
+        if self.is_empty:
+            if self._return_exceptions:
+                raise QueueEmpty("No items in the queue.")
+            else:
+                return
+            
+        
+        item = self._get_item(item)
+        
+        if item in self._queue:
+            self._remove(item)
+            self._insert(index, item)
+
