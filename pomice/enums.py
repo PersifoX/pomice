@@ -72,6 +72,7 @@ class TrackType(Enum):
     DEZEER = "dezeer"
     YANDEX_MUSIC = "yandex_music"
     APPLE_MUSIC = "apple_music"
+    TWITCH = "twitch"
     TTS = "ftts"
     HTTP = "http"
     LOCAL = "local"
