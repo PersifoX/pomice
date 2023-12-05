@@ -21,13 +21,12 @@ import orjson as json
 from disnake import Client, Interaction
 from disnake.ext import commands
 from disnake.utils import MISSING
+from ytmusicapi import YTMusic
 from websockets import client
 from websockets import exceptions
 from websockets import typing as wstype
 
 from . import __version__
-from . import applemusic
-from . import spotify
 from .enums import *
 from .enums import LogLevel
 from .exceptions import LavalinkVersionIncompatible
@@ -60,8 +59,7 @@ VERSION_REGEX = re.compile(r"(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[a-zA-Z0-9_-]+)?")
 class Node:
     """The base class for a node.
     This node object represents a Lavalink node.
-    To enable Spotify searching, pass in a proper Spotify Client ID and Spotify Client Secret
-    To enable Apple music, set the "apple_music" parameter to "True"
+    To enable recomendations via Youtube music, set `ytm_client_enable = True`.
     """
 
     __slots__ = (
@@ -77,6 +75,7 @@ class Node:
         "_resume_timeout",
         "_secure",
         "_fallback",
+        "_ytm_enable",
         "_log_level",
         "_websocket_uri",
         "_rest_uri",
@@ -89,10 +88,6 @@ class Node:
         "_version",
         "_headers",
         "_players",
-        "_spotify_client_id",
-        "_spotify_client_secret",
-        "_spotify_client",
-        "_apple_music_client",
         "_route_planner",
         "_log",
         "_log_handler",
@@ -115,10 +110,8 @@ class Node:
         resume_timeout: int = 60,
         loop: Optional[asyncio.AbstractEventLoop] = None,
         session: Optional[aiohttp.ClientSession] = None,
-        spotify_client_id: Optional[str] = None,
-        spotify_client_secret: Optional[str] = None,
-        apple_music: bool = False,
         fallback: bool = False,
+        ytm_enable: bool = True,
         log_level: LogLevel = LogLevel.INFO,
         log_handler: Optional[logging.Handler] = None,
     ):
@@ -136,6 +129,7 @@ class Node:
         self._resume_timeout: int = resume_timeout
         self._secure: bool = secure
         self._fallback: bool = fallback
+        self._ytm_enable: bool = ytm_enable
         self._log_level: LogLevel = log_level
         self._log_handler = log_handler
 
@@ -167,20 +161,9 @@ class Node:
 
         self._players: Dict[int, Player] = {}
 
-        self._spotify_client: Optional[spotify.Client] = None
-        self._apple_music_client: Optional[applemusic.Client] = None
+        if self._ytm_enable:
+            self._ytm_client = YTMusic(language='ru')
 
-        self._spotify_client_id: Optional[str] = spotify_client_id
-        self._spotify_client_secret: Optional[str] = spotify_client_secret
-
-        if self._spotify_client_id and self._spotify_client_secret:
-            self._spotify_client = spotify.Client(
-                self._spotify_client_id,
-                self._spotify_client_secret,
-            )
-
-        if apple_music:
-            self._apple_music_client = applemusic.Client()
 
         self._bot.add_listener(self._update_handler, "on_socket_response")
 
@@ -285,12 +268,6 @@ class Node:
                 "Lavalink version 3.7.0 or above is required to use this library.",
             )
 
-    async def _set_ext_client_session(self, session: aiohttp.ClientSession) -> None:
-        if self._spotify_client:
-            await self._spotify_client._set_session(session=session)
-
-        if self._apple_music_client:
-            await self._apple_music_client._set_session(session=session)
 
     async def _update_handler(self, data: dict) -> None:
         await self._bot.wait_until_ready()
@@ -473,7 +450,6 @@ class Node:
                 )
 
                 await self._handle_version_check(version=version)
-                await self._set_ext_client_session(session=self._session)
 
                 self._log.debug(
                     f"Version check from Node {self._identifier} successful. Returned version {version}",
@@ -726,6 +702,7 @@ class Node:
         self,
         *,
         track: Track,
+        playlist_id: Optional[str] = None,
         seed_tracks: Optional[str] = None,
         ctx: Optional[Union[commands.Context, Interaction]] = None,
         **kwargs
@@ -747,15 +724,20 @@ class Node:
                 query += f"&{param}={kwargs.get(param) if type(kwargs.get(param)) == str else ','.split(kwargs.get(param))}"
 
             return self.get_tracks(query=query, ctx=ctx or track.ctx,)
-
-            
                 
 
-        elif track.track_type == TrackType.YOUTUBE:
-            return await self.get_tracks(
-                query=f"ytsearch:https://www.youtube.com/watch?v={track.identifier}&list=RD{track.identifier}",
-                ctx=ctx,
-            )
+        elif track.track_type in TrackType.YOUTUBE:
+            if not playlist_id:
+                query = self._ytm_client.get_watch_playlist(videoId=track.identifier, **kwargs)['tracks']
+            else:
+                query = self._ytm_client.get_watch_playlist(playlistId=playlist_id, **kwargs)['tracks']
+
+            tracks = []
+
+            for song in query:
+                tracks.append(await self.build_track(song['videoId']))
+
+            return tracks
 
         else:
             raise TrackLoadError(
@@ -847,10 +829,7 @@ class NodePool:
         resume_key: Optional[str] = None,
         resume_timeout: int = 60,
         loop: Optional[asyncio.AbstractEventLoop] = None,
-        spotify_client_id: Optional[str] = None,
-        spotify_client_secret: Optional[str] = None,
         session: Optional[aiohttp.ClientSession] = None,
-        apple_music: bool = False,
         fallback: bool = False,
         log_level: LogLevel = LogLevel.INFO,
         log_handler: Optional[logging.Handler] = None,
@@ -875,10 +854,7 @@ class NodePool:
             resume_key=resume_key,
             resume_timeout=resume_timeout,
             loop=loop,
-            spotify_client_id=spotify_client_id,
             session=session,
-            spotify_client_secret=spotify_client_secret,
-            apple_music=apple_music,
             fallback=fallback,
             log_level=log_level,
             log_handler=log_handler,
