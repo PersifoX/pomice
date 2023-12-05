@@ -35,7 +35,7 @@ class Queue(Iterable[Track]):
         overflow: bool = True,
     ):
         self.max_size: Optional[int] = max_size
-        self._current_item: Track
+        self._current_item: Track | None = None
         self._queue: List[Track] = []
         self._overflow: bool = overflow
         self._loop_mode: Optional[LoopMode] = None

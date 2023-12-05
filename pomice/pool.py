@@ -75,7 +75,7 @@ class Node:
         "_resume_timeout",
         "_secure",
         "_fallback",
-        "_ytm_enable",
+        "_ytm_client",
         "_log_level",
         "_websocket_uri",
         "_rest_uri",
@@ -111,7 +111,7 @@ class Node:
         loop: Optional[asyncio.AbstractEventLoop] = None,
         session: Optional[aiohttp.ClientSession] = None,
         fallback: bool = False,
-        ytm_enable: bool = True,
+        ytm_client: Optional[YTMusic] = YTMusic(language='ru'),
         log_level: LogLevel = LogLevel.INFO,
         log_handler: Optional[logging.Handler] = None,
     ):
@@ -129,7 +129,7 @@ class Node:
         self._resume_timeout: int = resume_timeout
         self._secure: bool = secure
         self._fallback: bool = fallback
-        self._ytm_enable: bool = ytm_enable
+        self._ytm_client: Optional[YTMusic] = ytm_client
         self._log_level: LogLevel = log_level
         self._log_handler = log_handler
 
@@ -160,9 +160,6 @@ class Node:
         }
 
         self._players: Dict[int, Player] = {}
-
-        if self._ytm_enable:
-            self._ytm_client = YTMusic(language='ru')
 
 
         self._bot.add_listener(self._update_handler, "on_socket_response")
@@ -665,6 +662,7 @@ class Node:
                 Track(
                     track_id=track["encoded"],
                     info=track["info"],
+                    plugin_info=track["pluginInfo"],
                     ctx=ctx,
                     track_type=TrackType(track["info"]["sourceName"]),
                 )
@@ -685,6 +683,7 @@ class Node:
                 Track(
                     track_id=track["encoded"],
                     info=track["info"],
+                    plugin_info=track["pluginInfo"],
                     ctx=ctx,
                     track_type=TrackType(track["info"]["sourceName"]),
                     filters=filters,

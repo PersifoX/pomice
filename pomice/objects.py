@@ -21,8 +21,38 @@ from .filters import Filter
 __all__ = (
     "Track",
     "Playlist",
+    "Author",
 )
 
+class Author:
+    """The base author object. Returns author information needed for parsing by Lavalink plugin.
+    """
+
+    __slots__ = (
+        "name",
+        "type",
+        "avatar",
+        "url",
+        )
+    
+    def __init__(
+        self,
+        *,
+        name: str,
+        type: str,
+        avatar: Optional[str] = None,
+        url: Optional[str] = None
+    ):
+        
+        self.name: str = name
+        self.type: str = type
+
+        self.avatar: Optional[str] = avatar
+        self.url: Optional[str] = url
+        
+    def __str__(self) -> str:
+        return self.name
+    
 
 class Track:
     """The base track object. Returns critical track information needed for parsing by Lavalink.
@@ -32,9 +62,11 @@ class Track:
     __slots__ = (
         "track_id",
         "info",
+        "plugin_info",
         "track_type",
         "filters",
         "timestamp",
+        "lyrics",
         "original",
         "_search_type",
         "playlist",
@@ -53,11 +85,13 @@ class Track:
         "uuid"
     )
 
+
     def __init__(
         self,
         *,
         track_id: str,
         info: dict,
+        plugin_info: Optional[dict] = None,
         ctx: Optional[Union[commands.Context, Interaction]] = None,
         track_type: TrackType,
         search_type: SearchType = SearchType.ytsearch,
@@ -69,6 +103,7 @@ class Track:
     ):
         self.track_id: str = track_id
         self.info: dict = info
+        self.plugin_info: Optional[dict] = plugin_info
         self.track_type: TrackType = track_type
         self.filters: Optional[List[Filter]] = filters
         self.timestamp: Optional[float] = timestamp
@@ -81,11 +116,19 @@ class Track:
         self.playlist: Optional[Playlist] = playlist
 
         self.title: str = info.get("title", "Unknown Title")
-        self.author: str = info.get("author", "Unknown Author")
+        self.author: Union[str, Author] = info.get("author", "Unknown Author")
         self.uri: str = info.get("uri", "")
         self.identifier: str = info.get("identifier", "")
         self.isrc: Optional[str] = info.get("isrc", None)
-        self.thumbnail: Optional[str] = info.get("thumbnail")
+        self.thumbnail: Optional[str] = info.get("artworkUrl")
+
+        if plugin_info and plugin_info.get("artistUrl"):
+            self.author = Author(
+                name=self.author,
+                type=self.track_type.value,
+                avatar=plugin_info.get("artistArtworkUrl"),
+                url=plugin_info.get("artistUrl")
+            )
 
         self.length: int = info.get("length", 0)
         self.is_stream: bool = info.get("isStream", False)
@@ -110,6 +153,9 @@ class Track:
 
     def __repr__(self) -> str:
         return f"<Pomice.track title={self.title!r} uri=<{self.uri!r}> length={self.length}>"
+    
+    async def check_thumb(self):
+        pass
 
 
 class Playlist:
