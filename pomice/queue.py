@@ -223,7 +223,7 @@ class Queue(Iterable[Track]):
             self._current_item = self._queue[0]
 
         elif self.find_position(self._current_item) == self.count - 1:
-            return self.clear()
+            return self._queue.clear()
         
         else:
             self._current_item = self._queue[self.find_position(self._current_item) + 1]
@@ -406,7 +406,10 @@ class Queue(Iterable[Track]):
             self._current_item = self._get_item(item)
         
         else:
-            raise QueueException("Item not found in Queue.")
+            if self._return_exceptions:
+                raise QueueException("Item not found in Queue.")
+            else:
+                return
         
         return self._current_item
         
