@@ -5,7 +5,8 @@ name = "pypi"
 
 [packages]
 orjson = "*"
-"discord.py" = {extras = ["voice"], version = "*"}
+ytmusicapi = "*"
+"disnake" = {extras = ["voice"], version = "*"}
 
 [dev-packages]
 mypy = "*"
