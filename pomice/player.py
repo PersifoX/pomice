@@ -577,7 +577,7 @@ class Player(VoiceProtocol):
 
         return self._current
 
-    async def seek(self, position: float) -> float:
+    async def seek(self, position: int) -> int:
         """Seeks to a position in the currently playing track milliseconds"""
         if not self._current or not self._current.original:
             return 0.0
@@ -591,7 +591,7 @@ class Player(VoiceProtocol):
             method="PATCH",
             path=self._player_endpoint_uri,
             guild_id=self._guild.id,
-            data={"position": position},
+            data={"position": int(position)},
         )
 
         self._log.debug(f"Seeking to {position}.")
