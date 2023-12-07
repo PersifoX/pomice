@@ -643,7 +643,7 @@ class Node:
             )
 
         elif load_type in ("LOAD_FAILED", "error"):
-            exception = data["exception"]
+            exception = data.get("exception", data.get("data"))
             raise TrackLoadError(
                 f"{exception['message']} [{exception['severity']}]",
             )
